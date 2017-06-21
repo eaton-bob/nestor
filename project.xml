@@ -1,0 +1,26 @@
+<project
+    name = "fty-exdialogue"
+    description = "Example agent"
+    script = "zproject.gsl"
+    email = "EatonIPCOpenSource@eaton.com"
+    url = "https://42ity.org"
+    license = "GPL-2.0+"
+    repository = "https://github.com/42ity/fty-example"
+    >
+
+    <target name = "debian" />
+    <target name = "redhat" />
+    <target name = "travis" />
+
+    <include filename = "license.xml" />
+    <version major = "1" minor = "0" patch = "0" />
+
+    <use project = "czmq" min_major = "3" release = "v3.0.2" test = "zmsg_test"
+        repository="https://github.com/42ity/czmq.git"/>
+    <use project = "malamute" test = "mlm_server_test" />
+
+    <class name = "fty_exdialogue_server">Actor Server</class>
+    <class name = "fty_exdialogue_client">Actor Client</class>
+    <main name = "fty-exdialogue" service = "1">Binary</main>
+
+</project>
