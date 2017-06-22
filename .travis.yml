@@ -22,7 +22,7 @@ sudo: false
 #dist:
 #- trusty
 
-#services:
+services:
 - docker
 
 # Set CI_TIME=true to enable build-step profiling in Travis
