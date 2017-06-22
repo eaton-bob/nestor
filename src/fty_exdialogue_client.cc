@@ -146,7 +146,7 @@ fty_exdialogue_client (zsock_t *pipe, void* args)
     zsys_debug ("actor ready");
 
     while (!zsys_interrupted) {
-        void *which = zpoller_wait (poller, 1000);
+        void *which = zpoller_wait (poller, -1);
         if (which == pipe) {
             zmsg_t *message = zmsg_recv (pipe);
             char *actor_command = zmsg_popstr (message);
@@ -165,7 +165,7 @@ fty_exdialogue_client (zsock_t *pipe, void* args)
                     zstr_free (&actor_command);
                     zmsg_destroy (&message);                    
                     zpoller_destroy (&poller);
-                    return;                    
+                    break;                    
                 }
                 //assert (endpoint && myname);
                 int rv = mlm_client_connect (client, endpoint, 5000, myname);
@@ -179,7 +179,7 @@ fty_exdialogue_client (zsock_t *pipe, void* args)
                     zstr_free (&actor_command);
                     zmsg_destroy (&message);                    
                     zpoller_destroy (&poller);
-                    return;
+                    break;
                 }
                // zsys_debug ("bind ok");
                 zstr_free(&endpoint);
@@ -194,7 +194,7 @@ fty_exdialogue_client (zsock_t *pipe, void* args)
                     zstr_free (&actor_command);
                     zmsg_destroy (&message);                    
                     zpoller_destroy (&poller);
-                    return;
+                    break;
                 }
                 
                 //zsys_debug ("start ready");

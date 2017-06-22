@@ -3,19 +3,17 @@
 
 [Unit]
 Description=fty-exdialogue service
-After=network.target
-# Requires=network.target
-# Conflicts=shutdown.target
-# PartOf=fty-exdialogue.target
+After=malamute.service
+Requires=malamute.service
+PartOf=bios.target
 
 [Service]
 Type=simple
 # User=@uid@
 Environment="prefix=@prefix@"
 Environment='SYSTEMD_UNIT_FULLNAME=%n'
-ExecStart=@prefix@/bin/fty-exdialogue @sysconfdir@/@PACKAGE@/fty-exdialogue.cfg
+ExecStart=@prefix@/bin/fty-exdialogue --config @sysconfdir@/@PACKAGE@/fty-exdialogue.cfg
 Restart=always
 
 [Install]
-WantedBy=multi-user.target
-# WantedBy=fty-exdialogue.target
+WantedBy=bios.target

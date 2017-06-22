@@ -7,3 +7,11 @@ server
     background = 0      #   Run as background process
     workdir = .         #   Working directory for daemon
     verbose = 0         #   Do verbose logging of activity?
+
+malamute
+    endpoint = ipc://@/malamute         # Malamute endpoint
+
+dialogue
+    serverdname = Nestor               # Nom avec lequel se présentera le serveur (nom malamute = "servDialogue" + serverdname)
+    clientdname1 = Jacques               # Nom avec lequel se présentera le premier client (nom malamute = "servClient" + clientdname)
+    clientdname2 = Pierre                # Nom avec lequel se présentera le second client
