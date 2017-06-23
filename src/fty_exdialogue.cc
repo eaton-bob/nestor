@@ -94,63 +94,45 @@ int main (int argc, char *argv [])
        // zconfig_destroy (&config);
     }
     
-   //création du serveur nestor
-    std::string nomServnestor("servDialogue"+std::string(serverName));
+   //create server
+    std::string serverAddress("servDialogue"+std::string(serverName));
     std::vector<std::string> arguments;
     arguments.push_back(std::string(serverName));
     
     zactor_t *example_server = zactor_new (fty_exdialogue_server, (void *) &arguments);
-    zstr_sendx (example_server, "BIND", endpoint, nomServnestor.c_str(), NULL);
+    zstr_sendx (example_server, "BIND", endpoint, serverAddress.c_str(), NULL);
     
-    //création du client Louis
+    //create first client
     arguments.clear();
     arguments.push_back(std::string(clientName1));
-    std::string nomClient1("clientDia"+std::string(clientName1));
+    std::string addressClient1("clientDia"+std::string(clientName1));
     
-    zactor_t *client_louis = zactor_new (fty_exdialogue_client, (void *) &arguments);
-    zstr_sendx(client_louis, "BIND", endpoint, nomClient1.c_str(), NULL);
+    zactor_t *first_client = zactor_new (fty_exdialogue_client, (void *) &arguments);
+    zstr_sendx(first_client, "BIND", endpoint, addressClient1.c_str(), NULL);
     
     
-    //création du client Fabrice
+    //create second client
     arguments.clear();
     arguments.push_back(std::string(clientName2));
-    std::string nomClient2("clientDia"+std::string(clientName2));
+    std::string addressClient2("clientDia"+std::string(clientName2));
     
-    zactor_t *client_fabrice = zactor_new (fty_exdialogue_client, (void *) &arguments);
-    zstr_sendx(client_fabrice, "BIND", endpoint, nomClient2.c_str(), NULL);
+    zactor_t *second_client = zactor_new (fty_exdialogue_client, (void *) &arguments);
+    zstr_sendx(second_client, "BIND", endpoint, addressClient2.c_str(), NULL);
     
     
     
-    //Lancement des clients :
-    
-    zstr_sendx(client_louis, "START", nomServnestor.c_str(), NULL);
-    zstr_sendx(client_fabrice, "START", nomServnestor.c_str(), NULL);
-    
-    //zpoller_t *poller = zpoller_new (example_server, NULL);
+    //Launch client :   
     
     while (!zsys_interrupted) {
-        zstr_sendx(client_louis, "START", nomServnestor.c_str(), NULL);
-        zstr_sendx(client_fabrice, "START", nomServnestor.c_str(), NULL);
+        zstr_sendx(first_client, "START", serverAddress.c_str(), NULL);
+        zstr_sendx(second_client, "START", serverAddress.c_str(), NULL);
         sleep(1); 
     }
-   /*
-    //  Accept and print any message back from server
-    //  copy from src/malamute.c under MPL license
-    while (true) {
-        char *message = zstr_recv (example_server);
-        if (message) {
-            puts (message);
-            free (message);
-        }
-        else {
-            puts ("interrupted");
-            break;
-        }
-    }*/
+
     if(config_file)
         zconfig_destroy (&config);
     zactor_destroy (&example_server);
-    zactor_destroy (&client_louis);
-    zactor_destroy (&client_fabrice);
+    zactor_destroy (&first_client);
+    zactor_destroy (&second_client);
     return EXIT_SUCCESS;
 }
