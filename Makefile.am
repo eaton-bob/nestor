@@ -38,13 +38,13 @@ EXTRA_DIST =
 CLEANFILES =
 DISTCLEANFILES =
 
-if ENABLE_DIST_CMAKEFILES
-EXTRA_DIST += \
-    Findlibzmq.cmake \
-    Findczmq.cmake \
-    Findmalamute.cmake \
-    CMakeLists.txt
-endif
+#if ENABLE_DIST_CMAKEFILES
+#EXTRA_DIST += \
+#    Findlibzmq.cmake \
+#    Findczmq.cmake \
+#    Findmalamute.cmake \
+#    CMakeLists.txt
+#endif
 
 EXTRA_DIST += \
     src/fty_exdialogue_classes.h

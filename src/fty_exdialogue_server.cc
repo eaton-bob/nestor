@@ -46,7 +46,6 @@ s_handle_mailbox (mlm_client_t *client, zmsg_t **message_p, std::string nom)
         zmsg_destroy(&message);
         zmsg_t *reply  = zmsg_new ();
         zmsg_addstr (reply, "ERROR");
-
         int rv = mlm_client_sendto (client, mlm_client_sender (client), "example", NULL, 1000, &reply);
         if (rv != 0) {
             zmsg_destroy (&reply);
@@ -55,7 +54,7 @@ s_handle_mailbox (mlm_client_t *client, zmsg_t **message_p, std::string nom)
                     mlm_client_sender (client), "example");
         }
         return;
-    }
+    } 
     
     char *part = zmsg_popstr (message);
     if (!part) {
@@ -73,14 +72,14 @@ s_handle_mailbox (mlm_client_t *client, zmsg_t **message_p, std::string nom)
         }
         return;
     }
-    std::string reponse;
-    zsys_debug("%s dit : %s", nomClient, part);
+    std::string answer;
+    zsys_debug("%s say : %s", nomClient, part);
     
-    if (streq (part, "Bonjour !")) {
+    if (streq (part, "Hello !")) {
         zmsg_t *reply  = zmsg_new ();
-        reponse = "Bonjour " + std::string(nomClient) + ".";
-        zmsg_addstr (reply, "Inconnu");
-        zmsg_addstr (reply, reponse.c_str());
+        answer = "Hello " + std::string(nomClient) + ".";
+        zmsg_addstr (reply, "Stranger");
+        zmsg_addstr (reply, answer.c_str());
 
         int rv = mlm_client_sendto (client, mlm_client_sender (client), "example", NULL, 1000, &reply);
         if (rv != 0) {
@@ -89,11 +88,11 @@ s_handle_mailbox (mlm_client_t *client, zmsg_t **message_p, std::string nom)
                     "mlm_client_sendto (sender = '%s', subject = '%s', timeout = '1000') failed.",
                     mlm_client_sender (client), "example");
         } 
-    }else if(streq (part, "Qui es-tu ?")) {
+    }else if(streq (part, "Who are you ?")) {
         zmsg_t *reply = zmsg_new();
-        reponse = "Je me nomme " + nom;
+        answer = "My name is " + nom;
         zmsg_addstr (reply, nom.c_str());
-        zmsg_addstr (reply, reponse.c_str());
+        zmsg_addstr (reply, answer.c_str());
                 
         int rv = mlm_client_sendto(client, mlm_client_sender(client), "example", NULL, 1000, &reply);
         if(rv != 0){
@@ -102,11 +101,11 @@ s_handle_mailbox (mlm_client_t *client, zmsg_t **message_p, std::string nom)
                     "mlm_client_sendto (sender = '%s', subject = '%s', timeout = '1000') failed.",
                     mlm_client_sender (client), "example");
         }
-    } else if(streq (part, std::string("Au revoir" + nom + " !").c_str())) {
+    } else if(streq (part, std::string("Good bye " + nom + " !").c_str())) {
         zmsg_t *reply = zmsg_new();
-        reponse = "Au revoir " + std::string(nomClient) + ".";
+        answer = "Good bye " + std::string(nomClient) + ".";
         zmsg_addstr(reply, nom.c_str());
-        zmsg_addstr(reply, reponse.c_str());
+        zmsg_addstr(reply, answer.c_str());
         
         int rv = mlm_client_sendto(client, mlm_client_sender(client), "example", NULL, 1000, &reply);
         if(rv != 0){
@@ -118,7 +117,6 @@ s_handle_mailbox (mlm_client_t *client, zmsg_t **message_p, std::string nom)
     }else{
         zmsg_t *reply  = zmsg_new ();
         zmsg_addstr (reply, "ERROR");
-        //zmsg_addstr (reply, "Je ne comprend pas.");
 
         int rv = mlm_client_sendto (client, mlm_client_sender (client), "example", NULL, 1000, &reply);
         if (rv != 0) {
@@ -138,11 +136,11 @@ fty_exdialogue_server (zsock_t *pipe, void* args)
 {
     std::vector<std::string> arguments = *(std::vector<std::string> *) args;
     //const char * endpoint = arguments[0].c_str();
-    std::string nom = arguments[0];
+    std::string name = arguments[0];
     
     
     //zsys_debug ("endpoint: %s \n", endpoint);
-    zsys_debug("Nom du serveur : %s", nom.c_str());
+    zsys_debug("Server name : %s", name.c_str());
     
 
     mlm_client_t *client = mlm_client_new ();
@@ -200,7 +198,7 @@ fty_exdialogue_server (zsock_t *pipe, void* args)
                 break;
             }
             if (streq (mlm_client_command (client), "MAILBOX DELIVER")) {
-                s_handle_mailbox (client, &message, nom);
+                s_handle_mailbox (client, &message, name);
             }
             else {
                 zsys_warning (
@@ -228,10 +226,10 @@ fty_exdialogue_server_test (bool verbose)
     //  @selftest
     
     printf (" * fty_exdialogue_server: ");
-    std::string nomServ("testServeurDialogue");
+    std::string serverAddress("testServeurDialogue");
     //const char *nomServ = std::string("testServeurDialogue").c_str();
     static const char* endpoint = "inproc://fty-exdialogue-server-test"; 
-    std::string nomClient("Maurice");
+    std::string clientName("Maurice");
     
      //  Set up broker, fty example server actor and third party actor
     zactor_t *server = zactor_new (mlm_server, (void*)"Malamute");
@@ -243,27 +241,27 @@ fty_exdialogue_server_test (bool verbose)
     std::vector<std::string> arguments;
     arguments.push_back("Georges");
     zactor_t *example_server = zactor_new (fty_exdialogue_server, (void*) &arguments);
-    zstr_sendx (example_server, "BIND", endpoint, nomServ.c_str(), NULL);
+    zstr_sendx (example_server, "BIND", endpoint, serverAddress.c_str(), NULL);
     
     mlm_client_t *client = mlm_client_new ();
     int rv = mlm_client_connect (client, endpoint, 5000, "clientDialogue");
     assert(rv == 0);
     
     zmsg_t *message = zmsg_new();
-    std::string nomConnu("Inconnu");
-    zmsg_addstr (message, nomClient.c_str());
-    zmsg_addstr (message, "Bonjour !");
-    rv = mlm_client_sendto (client, nomServ.c_str(), "example", NULL, 1000, &message);
+    std::string knowName("Stranger");
+    zmsg_addstr (message, clientName.c_str());
+    zmsg_addstr (message, "Hello !");
+    rv = mlm_client_sendto (client, serverAddress.c_str(), "example", NULL, 1000, &message);
    assert(rv == 0);
     message = mlm_client_recv (client);
     assert(message);
     
     char *nomD = zmsg_popstr (message);
     char *phrase = zmsg_popstr (message);
-    std::string attendu = "Bonjour " + nomClient + ".";
-    assert(streq(phrase, attendu.c_str()));
+    std::string expected = "Hello " + clientName + ".";
+    assert(streq(phrase, expected.c_str()));
     
-    zsys_debug("%s dit : %s", nomConnu.c_str(), phrase);
+    zsys_debug("%s say : %s", knowName.c_str(), phrase);
     
     zstr_free (&nomD);
     zstr_free (&phrase);
@@ -272,9 +270,9 @@ fty_exdialogue_server_test (bool verbose)
     
     
     message = zmsg_new();
-    zmsg_addstr (message, nomClient.c_str());
-    zmsg_addstr (message, "Qui es-tu ?");
-    rv = mlm_client_sendto (client, nomServ.c_str(), "example", NULL, 1000, &message);
+    zmsg_addstr (message, clientName.c_str());
+    zmsg_addstr (message, "Who are you ?");
+    rv = mlm_client_sendto (client, serverAddress.c_str(), "example", NULL, 1000, &message);
     
     assert(rv == 0);
     
@@ -283,32 +281,32 @@ fty_exdialogue_server_test (bool verbose)
     
     nomD = zmsg_popstr (message);
     phrase = zmsg_popstr (message);
-    attendu = "Je me nomme " + std::string(nomD);
-    assert(streq(phrase, attendu.c_str()));
+    expected = "My name is " + std::string(nomD);
+    assert(streq(phrase, expected.c_str()));
     
-    zsys_debug("%s dit : %s", nomConnu.c_str(), phrase);
+    zsys_debug("%s say : %s", knowName.c_str(), phrase);
     
-    nomConnu = nomD;
+    knowName = nomD;
     zstr_free (&nomD);
     zstr_free (&phrase);
     zmsg_destroy (&message);
     
     
     message = zmsg_new();
-    zmsg_addstr (message, nomClient.c_str());
-    zmsg_addstr (message, std::string("Au revoir" + nomConnu + " !").c_str());
+    zmsg_addstr (message, clientName.c_str());
+    zmsg_addstr (message, std::string("Good bye " + knowName + " !").c_str());
     
-    rv = mlm_client_sendto (client, nomServ.c_str(), "example", NULL, 1000, &message);
+    rv = mlm_client_sendto (client, serverAddress.c_str(), "example", NULL, 1000, &message);
     assert(rv == 0);
     message = mlm_client_recv (client);
     assert(message);
     
     nomD = zmsg_popstr (message);
     phrase = zmsg_popstr (message);
-    attendu = "Au revoir " + nomClient + ".";
-    assert(streq(phrase, attendu.c_str()));
+    expected = "Good bye " + clientName + ".";
+    assert(streq(phrase, expected.c_str()));
     
-    zsys_debug("%s dit : %s", nomConnu.c_str(), phrase);
+    zsys_debug("%s say : %s", knowName.c_str(), phrase);
     
     zstr_free (&nomD);
     zstr_free (&phrase);
