@@ -29,6 +29,10 @@ fi
 mkdir -p tmp
 BUILD_PREFIX=$PWD/tmp
 
+# Use tools from prerequisites we might have built
+PATH="${BUILD_PREFIX}/sbin:${BUILD_PREFIX}/bin:${PATH}"
+export PATH
+
 CONFIG_OPTS=()
 CONFIG_OPTS+=("CFLAGS=-I${BUILD_PREFIX}/include")
 CONFIG_OPTS+=("CPPFLAGS=-I${BUILD_PREFIX}/include")
@@ -46,6 +50,10 @@ CMAKE_OPTS+=("-DCMAKE_INSTALL_PREFIX:PATH=${BUILD_PREFIX}")
 CMAKE_OPTS+=("-DCMAKE_PREFIX_PATH:PATH=${BUILD_PREFIX}")
 CMAKE_OPTS+=("-DCMAKE_LIBRARY_PATH:PATH=${BUILD_PREFIX}/lib")
 CMAKE_OPTS+=("-DCMAKE_INCLUDE_PATH:PATH=${BUILD_PREFIX}/include")
+
+if [ "$CLANG_FORMAT" != "" ] ; then
+    CMAKE_OPTS+=("-DCLANG_FORMAT=${CLANG_FORMAT}")
+fi
 
 # Clone and build dependencies
 [ -z "$CI_TIME" ] || echo "`date`: Starting build of dependencies (if any)..."
@@ -131,15 +139,31 @@ if ! ((command -v dpkg-query >/dev/null 2>&1 && dpkg-query --list libmlm-dev >/d
     cd "${BASE_PWD}"
 fi
 
-# Build and check this project
 cd ../..
+
+# always install custom builds from dist if the autotools chain exists
+# to make sure that `make dist` doesn't omit any files required to build & test
+if [ -z "$DO_CLANG_FORMAT_CHECK" -a -f configure.ac ]; then
+    $CI_TIME ./autogen.sh
+    $CI_TIME ./configure "${CONFIG_OPTS[@]}"
+    $CI_TIME make -j5 dist-gzip
+    $CI_TIME tar -xzf fty-exdialogue-1.0.0.tar.gz
+    cd fty-exdialogue-1.0.0
+fi
+
+# Build and check this project
 [ -z "$CI_TIME" ] || echo "`date`: Starting build of currently tested project..."
 CCACHE_BASEDIR=${PWD}
 export CCACHE_BASEDIR
-PKG_CONFIG_PATH=${BUILD_PREFIX}/lib/pkgconfig $CI_TIME cmake "${CMAKE_OPTS[@]}" .
-$CI_TIME make all VERBOSE=1 -j4
-$CI_TIME ctest -V
-$CI_TIME make install
+if [ "$DO_CLANG_FORMAT_CHECK" = "1" ] ; then
+    PKG_CONFIG_PATH=${BUILD_PREFIX}/lib/pkgconfig $CI_TIME cmake "${CMAKE_OPTS[@]}" . \
+    && make clang-format-check || { make clang-format-diff && exit 1 ; }
+else
+    PKG_CONFIG_PATH=${BUILD_PREFIX}/lib/pkgconfig $CI_TIME cmake "${CMAKE_OPTS[@]}" .
+    $CI_TIME make all VERBOSE=1 -j4
+    $CI_TIME ctest -V
+    $CI_TIME make install
+fi
 [ -z "$CI_TIME" ] || echo "`date`: Builds completed without fatal errors!"
 
 echo "=== Are GitIgnores good after making the project '$BUILD_TYPE'? (should have no output below)"

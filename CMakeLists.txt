@@ -6,15 +6,17 @@
 ########################################################################
 # Project setup
 ########################################################################
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 2.8.8)
 project(fty_exdialogue)
-enable_language(C)
+enable_language(CXX)
 enable_testing()
 
 set(SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
 # Select flags
 SET(CMAKE_C_FLAGS_RELEASE "-O3")
+
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/builds/cmake/Modules)
 
 # Will be used to add flags to pkg-config useful when apps want to statically link
 set(pkg_config_libs_private "")
@@ -58,7 +60,7 @@ configure_file("${SOURCE_DIR}/src/platform.h.in" "${SOURCE_DIR}/src/platform.h")
 #so the sources have to be compiled as c++
 if (MSVC)
     enable_language(CXX)
-    file(GLOB sources "${SOURCE_DIR}/src/*.c")
+    file(GLOB sources "${SOURCE_DIR}/src/*.cc")
     set_source_files_properties(
         ${sources}
         PROPERTIES LANGUAGE CXX
@@ -67,7 +69,7 @@ if (MSVC)
 endif()
 
 # specific case of windows UWP
-if( ${CMAKE_SYSTEM_NAME} STREQUAL "WindowsStore" AND ${CMAKE_SYSTEM_VERSION} STREQUAL "10.0")
+if( "${CMAKE_SYSTEM_NAME}" STREQUAL "WindowsStore" AND "${CMAKE_SYSTEM_VERSION}" STREQUAL "10.0")
   ADD_DEFINITIONS(-DZMQ_HAVE_WINDOWS_UWP)
   ADD_DEFINITIONS(-D_WIN32_WINNT=_WIN32_WINNT_WIN10)
 endif()
@@ -123,6 +125,16 @@ ELSE (MALAMUTE_FOUND)
 ENDIF (MALAMUTE_FOUND)
 
 ########################################################################
+# version
+########################################################################
+set(FTY_EXDIALOGUE_VERSION_MAJOR 1)
+set(FTY_EXDIALOGUE_VERSION_MINOR 0)
+set(FTY_EXDIALOGUE_VERSION_PATCH 0)
+set(FTY_EXDIALOGUE_VERSION "${FTY_EXDIALOGUE_VERSION_MAJOR}.${FTY_EXDIALOGUE_VERSION_MINOR}.${FTY_EXDIALOGUE_VERSION_PATCH}")
+message(STATUS "Detected FTY_EXDIALOGUE Version - ${FTY_EXDIALOGUE_VERSION}")
+
+
+########################################################################
 # includes
 ########################################################################
 set (fty_exdialogue_headers
@@ -143,14 +155,16 @@ install(FILES ${fty_exdialogue_headers} DESTINATION include)
 ########################################################################
 # library
 ########################################################################
+
+
 include_directories("${SOURCE_DIR}/src" "${SOURCE_DIR}/include")
 set (fty_exdialogue_sources
 )
 
 IF (ENABLE_DRAFTS)
     list (APPEND fty_exdialogue_sources
-        src/fty_exdialogue_server.c
-        src/fty_exdialogue_client.c
+        src/fty_exdialogue_server.cc
+        src/fty_exdialogue_client.cc
     )
 ENDIF (ENABLE_DRAFTS)
 
@@ -161,28 +175,96 @@ IF (ENABLE_DRAFTS)
 ENDIF (ENABLE_DRAFTS)
 
 source_group("Source Files" FILES ${fty_exdialogue_sources})
-if (NOT DEFINED BUILD_SHARED_LIBS)
-    SET(BUILD_SHARED_LIBS ON)
-endif()
-add_library(fty_exdialogue ${fty_exdialogue_sources})
-set_target_properties(fty_exdialogue
-    PROPERTIES DEFINE_SYMBOL "FTY_EXDIALOGUE_EXPORTS"
-)
-set_target_properties (fty_exdialogue
-    PROPERTIES SOVERSION "0"
-)
-set_target_properties (fty_exdialogue
-    PROPERTIES VERSION "1.0.0"
-)
-target_link_libraries(fty_exdialogue
-    ${ZEROMQ_LIBRARIES} ${MORE_LIBRARIES}
-)
 
-install(TARGETS fty_exdialogue
+
+option(FTY_EXDIALOGUE_BUILD_SHARED "Whether or not to build the shared object" ON)
+option(FTY_EXDIALOGUE_BUILD_STATIC "Whether or not to build the static archive" ON)
+
+if (NOT FTY_EXDIALOGUE_BUILD_SHARED AND NOT FTY_EXDIALOGUE_BUILD_STATIC)
+  message(FATAL_ERROR "Neither static nor shared library build enabled")
+endif()
+
+IF (NOT MSVC)
+  # avoid building everything twice for shared + static
+  # only on *nix, as Windows needs different preprocessor defines in static builds
+  add_library (fty_exdialogue_objects OBJECT ${fty_exdialogue_sources})
+  set_property(TARGET fty_exdialogue_objects PROPERTY POSITION_INDEPENDENT_CODE ON)
+ENDIF (NOT MSVC)
+
+# shared
+if (FTY_EXDIALOGUE_BUILD_SHARED)
+  IF (MSVC)
+    add_library(fty_exdialogue SHARED ${fty_exdialogue_sources})
+  ELSE (MSVC)
+    add_library(fty_exdialogue SHARED $<TARGET_OBJECTS:fty_exdialogue_objects>)
+  ENDIF (MSVC)
+
+  set_target_properties (fty_exdialogue PROPERTIES
+    PUBLIC_HEADER "${public_headers}"
+    DEFINE_SYMBOL "FTY_EXDIALOGUE_EXPORTS"
+    SOVERSION "0"
+    VERSION "${FTY_EXDIALOGUE_VERSION}"
+    COMPILE_DEFINITIONS "DLL_EXPORT"
+    OUTPUT_NAME "fty_exdialogue"
+    PREFIX "lib"
+  )
+
+  target_link_libraries(fty_exdialogue
+    PUBLIC ${MORE_LIBRARIES}
+  )
+
+  install(TARGETS fty_exdialogue
+    EXPORT fty_exdialogue-targets
     LIBRARY DESTINATION "lib${LIB_SUFFIX}" # .so file
     ARCHIVE DESTINATION "lib${LIB_SUFFIX}" # .lib file
-    RUNTIME DESTINATION bin              # .dll file
-)
+    RUNTIME DESTINATION bin                # .dll file
+  )
+
+  target_include_directories(fty_exdialogue
+    PUBLIC
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+      $<INSTALL_INTERFACE:include>
+  )
+endif()
+
+# static
+if (FTY_EXDIALOGUE_BUILD_STATIC)
+  IF (MSVC)
+    add_library(fty_exdialogue-static STATIC ${fty_exdialogue_sources})
+  ELSE (MSVC)
+    add_library(fty_exdialogue-static STATIC $<TARGET_OBJECTS:fty_exdialogue_objects>)
+  ENDIF (MSVC)
+
+  set_target_properties(fty_exdialogue-static PROPERTIES
+    PUBLIC_HEADER "${public_headers}"
+    COMPILE_DEFINITIONS "FTY_EXDIALOGUE_STATIC"
+    OUTPUT_NAME "fty_exdialogue"
+    PREFIX "lib"
+  )
+
+  target_link_libraries(fty_exdialogue-static
+    PUBLIC ${MORE_LIBRARIES}
+  )
+
+  install(TARGETS fty_exdialogue-static
+    EXPORT fty_exdialogue-targets
+    LIBRARY DESTINATION "lib${LIB_SUFFIX}" # .so file
+    ARCHIVE DESTINATION "lib${LIB_SUFFIX}" # .lib file
+    RUNTIME DESTINATION bin                # .dll file
+  )
+
+  target_include_directories(fty_exdialogue-static
+    PUBLIC
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+      $<INSTALL_INTERFACE:include>
+  )
+  target_compile_definitions(fty_exdialogue-static
+    PUBLIC FTY_EXDIALOGUE_STATIC
+  )
+
+endif()
+
+
 
 ########################################################################
 # pkgconfig
@@ -208,12 +290,41 @@ install(
 )
 
 ########################################################################
+# installer
+########################################################################
+include(CMakePackageConfigHelpers)
+if (WIN32)
+  set(CMAKECONFIG_INSTALL_DIR "CMake" CACHE STRING "install path for fty_exdialogueConfig.cmake")
+else()
+  # GNUInstallDirs "DATADIR" wrong here; CMake search path wants "share".
+  set(CMAKECONFIG_INSTALL_DIR "share/cmake/fty_exdialogue" CACHE STRING "install path for fty_exdialogueConfig.cmake")
+endif()
+
+if (NOT CMAKE_VERSION VERSION_LESS 3.0)
+  export(EXPORT fty_exdialogue-targets
+         FILE "${CMAKE_CURRENT_BINARY_DIR}/fty_exdialogueTargets.cmake")
+endif()
+configure_package_config_file(builds/cmake/Config.cmake.in
+                              "${CMAKE_CURRENT_BINARY_DIR}/fty_exdialogueConfig.cmake"
+                              INSTALL_DESTINATION ${CMAKECONFIG_INSTALL_DIR})
+write_basic_package_version_file(${CMAKE_CURRENT_BINARY_DIR}/fty_exdialogueConfigVersion.cmake
+                                 VERSION ${FTY_EXDIALOGUE_VERSION}
+                                 COMPATIBILITY AnyNewerVersion)
+install(EXPORT fty_exdialogue-targets
+        FILE fty_exdialogueTargets.cmake
+        DESTINATION ${CMAKECONFIG_INSTALL_DIR})
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/fty_exdialogueConfig.cmake
+              ${CMAKE_CURRENT_BINARY_DIR}/fty_exdialogueConfigVersion.cmake
+              DESTINATION ${CMAKECONFIG_INSTALL_DIR})
+
+########################################################################
 # executables
 ########################################################################
 add_executable(
     fty-exdialogue
-    "${SOURCE_DIR}/src/fty-exdialogue.c"
+    "${SOURCE_DIR}/src/fty-exdialogue.cc"
 )
+if (TARGET fty_exdialogue)
 target_link_libraries(
     fty-exdialogue
     fty_exdialogue
@@ -222,13 +333,25 @@ target_link_libraries(
     ${MALAMUTE_LIBRARIES}
     ${OPTIONAL_LIBRARIES}
 )
+endif()
+if (NOT TARGET fty_exdialogue AND TARGET fty_exdialogue-static)
+target_link_libraries(
+    fty-exdialogue
+    fty_exdialogue-static
+    ${LIBZMQ_LIBRARIES}
+    ${CZMQ_LIBRARIES}
+    ${MALAMUTE_LIBRARIES}
+    ${OPTIONAL_LIBRARIES}
+)
+endif()
 install(TARGETS fty-exdialogue
     RUNTIME DESTINATION bin
 )
 add_executable(
     fty_exdialogue_selftest
-    "${SOURCE_DIR}/src/fty_exdialogue_selftest.c"
+    "${SOURCE_DIR}/src/fty_exdialogue_selftest.cc"
 )
+if (TARGET fty_exdialogue)
 target_link_libraries(
     fty_exdialogue_selftest
     fty_exdialogue
@@ -237,6 +360,17 @@ target_link_libraries(
     ${MALAMUTE_LIBRARIES}
     ${OPTIONAL_LIBRARIES}
 )
+endif()
+if (NOT TARGET fty_exdialogue AND TARGET fty_exdialogue-static)
+target_link_libraries(
+    fty_exdialogue_selftest
+    fty_exdialogue-static
+    ${LIBZMQ_LIBRARIES}
+    ${CZMQ_LIBRARIES}
+    ${MALAMUTE_LIBRARIES}
+    ${OPTIONAL_LIBRARIES}
+)
+endif()
 
 ########################################################################
 # tests
@@ -267,6 +401,22 @@ IF (ENABLE_DRAFTS)
     )
 ENDIF (ENABLE_DRAFTS)
 
+
+add_custom_target(
+    copy-selftest-ro ALL
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/src/selftest-ro ${CMAKE_BINARY_DIR}/src/selftest-ro
+)
+
+add_custom_target(
+    make-selftest-rw ALL
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/src/selftest-rw
+)
+
+set_directory_properties(
+    PROPERTIES
+    ADDITIONAL_MAKE_CLEAN_FILES "${CMAKE_BINARY_DIR}/src/selftest-ro;${CMAKE_BINARY_DIR}/src/selftest-rw"
+)
+
 foreach(TEST_CLASS ${TEST_CLASSES})
     add_test(
         NAME ${TEST_CLASS}
@@ -275,6 +425,10 @@ foreach(TEST_CLASS ${TEST_CLASSES})
     set_tests_properties(
         ${TEST_CLASS}
         PROPERTIES TIMEOUT ${CLASSTEST_TIMEOUT}
+    )
+    set_tests_properties(
+        ${TEST_CLASS}
+        PROPERTIES DEPENDS "copy-selftest-ro;make-selftest-rw"
     )
 endforeach(TEST_CLASS)
 
@@ -309,6 +463,8 @@ add_custom_command(
     TARGET  distclean
 )
 
+include(ClangFormat OPTIONAL)
+
 ########################################################################
 # summary
 ########################################################################
@@ -321,6 +477,8 @@ message (STATUS "  C compiler        :   ${CMAKE_C_COMPILER}")
 message (STATUS "  Debug C flags     :   ${CMAKE_C_FLAGS_DEBUG} ${CMAKE_C_FLAGS}")
 message (STATUS "  Release C flags   :   ${CMAKE_C_FLAGS_RELEASE} ${CMAKE_C_FLAGS}")
 message (STATUS "  Build type        :   ${CMAKE_BUILD_TYPE}")
+message (STATUS "  Static build      :   ${FTY_EXDIALOGUE_BUILD_STATIC}")
+message (STATUS "  Shared build      :   ${FTY_EXDIALOGUE_BUILD_SHARED}")
 IF (ENABLE_DRAFTS)
 message (STATUS "  Draft API         :   Yes")
 ELSE (ENABLE_DRAFTS)
