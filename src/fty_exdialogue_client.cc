@@ -31,188 +31,276 @@
 
 #include "fty_exdialogue_classes.h"
 
-//  Structure of our class
-static int
-s_dialogue_mailbox(mlm_client_t *client, std::string clientName, char* servAddress)
+//handle mailboxes
+static void
+s_dialogue_mailbox(mlm_client_t *client, std::string clientName, char *servAddress)
 {
-    zmsg_t *message = zmsg_new();
     std::string knowName("Stranger");
-    zmsg_addstr (message, clientName.c_str());
-    zmsg_addstr (message, "Hello !");
-    int rv = mlm_client_sendto (client, servAddress, "example", NULL, 1000, &message);
-    if(rv != 0)
-        return -1;
-    message = mlm_client_recv (client);
-    if(!message)
-        return -1;
-    
-    char *nomD = zmsg_popstr (message);
-    char *sentence = zmsg_popstr (message);
-    std::string expected = "Hello " + clientName + ".";
-    if(!streq(sentence, expected.c_str()))
+    zmsg_t *message = NULL;
+    int rv;
+
+    //send 'hello !' welcome msg 
     {
-       zsys_error("Message expected : %s \n message get : %s", expected.c_str(), sentence);
-       return -1; 
+        message = zmsg_new();
+        assert(message);
+        zmsg_addstr(message, clientName.c_str());
+        zmsg_addstr(message, "Hello !");
+
+        rv = mlm_client_sendto (client, servAddress, "example", NULL, 1000, &message);
+        zmsg_destroy(&message);
+ 
+        if (rv != 0) {
+            zsys_error("CLIENT mlm_client_sendto() failed");
+            return;
+        }
+    }
+    // handle response
+    {
+        message = mlm_client_recv (client);
+        if (!message) {
+            zsys_error("CLIENT mlm_client_recv() failed");
+            return;
+        }
+
+        char *inName = zmsg_popstr(message);
+        char *sentence = zmsg_popstr(message);
+
+        //check consistency
+        int stop = 0;
+        std::string expected = "Hello " + clientName + ".";
+        if (!streq(sentence, expected.c_str()))
+        {
+           zsys_error("CLIENT Message expected: %s, received : %s", expected.c_str(), sentence);
+           stop = 1; 
+        } else {
+            zsys_debug("CLIENT %s say : %s", knowName.c_str(), sentence);
+        }
+
+        //cleanup
+        zstr_free(&inName);
+        zstr_free(&sentence);
+        zmsg_destroy(&message);
+
+        if (stop)
+            return;
+    }
+
+    // send 'who are you ?' msg
+    {
+        message = zmsg_new();
+        assert(message);
+        zmsg_addstr (message, clientName.c_str());
+        zmsg_addstr (message, "Who are you ?");
+
+        rv = mlm_client_sendto (client, servAddress, "example", NULL, 1000, &message);
+        zmsg_destroy(&message);
+        
+        if (rv != 0) {
+            zsys_error("CLIENT mlm_client_sendto() failed");
+            return;
+        }
+    }
+    //handle response
+    {
+        message = mlm_client_recv (client);
+        if (!message) {
+           zsys_error("CLIENT mlm_client_recv() failed");
+           return;
+        }
+
+        char *inName = zmsg_popstr(message);
+        char *sentence = zmsg_popstr(message);
+
+        //check consistency
+        int stop = 0;
+        std::string expected = "My name is " + std::string(inName);
+        if (!streq(sentence, expected.c_str()))
+        {
+           zsys_error("CLIENT Message expected: %s, received : %s", expected.c_str(), sentence);
+           stop = 1;
+        } else {
+            zsys_debug("CLIENT %s say : %s", knowName.c_str(), sentence);
+
+            //ok, save name
+            knowName = inName;
+        }
+
+        //cleanup
+        zstr_free(&inName);
+        zstr_free(&sentence);
+        zmsg_destroy(&message);
+
+        if (stop)
+            return;
+    }
+
+    //send 'bye' msg
+    {
+        message = zmsg_new();
+        assert(message);
+        zmsg_addstr (message, clientName.c_str());
+        zmsg_addstr (message, std::string("Good bye " + knowName + " !").c_str());
+
+        rv = mlm_client_sendto (client, servAddress, "example", NULL, 1000, &message);
+        zmsg_destroy(&message);
+        
+        if (rv != 0) {
+            zsys_error("CLIENT mlm_client_sendto() failed");
+            return;
+        }
+    }
+    //handle response
+    {   
+        message = mlm_client_recv (client);
+        if (!message) {
+           zsys_error("CLIENT mlm_client_recv() failed");
+           return;
+        }
+
+        char *inName = zmsg_popstr(message);
+        char *sentence = zmsg_popstr(message);
+        
+        //check consistency
+        int stop = 0;
+        std::string expected = "Good bye " + clientName + ".";
+        if (!streq(sentence, expected.c_str()))
+        {
+           zsys_error("CLIENT Message expected: %s, received : %s", expected.c_str(), sentence);
+           stop = 1;
+        } else {
+            zsys_debug("CLIENT %s say : %s", knowName.c_str(), sentence);
+        }
+
+        //cleanup
+        zstr_free(&inName);
+        zstr_free(&sentence);
+        zmsg_destroy(&message);
+
+        if (stop)
+            return;
     }
     
-    zsys_debug("%s say : %s", knowName.c_str(), sentence);
-    
-    zstr_free (&nomD);
-    zstr_free (&sentence);
-    zmsg_destroy (&message);
-    
-    
-    
-    message = zmsg_new();
-    zmsg_addstr (message, clientName.c_str());
-    zmsg_addstr (message, "Who are you ?");
-    rv = mlm_client_sendto (client, servAddress, "example", NULL, 1000, &message);
-    if(rv != 0)
-        return -1;
-    message = mlm_client_recv (client);
-    if(!message)
-        return -1;
-    
-    nomD = zmsg_popstr (message);
-    sentence = zmsg_popstr (message);
-    expected = "My name is " + std::string(nomD);
-    if(!streq(sentence, expected.c_str()))
-    {
-       zsys_error("Message expected : %s \n message get : %s", expected.c_str(), sentence);
-       return -1; 
-    }
-    
-    zsys_debug("%s say : %s", knowName.c_str(), sentence);
-    
-    knowName = nomD;
-    zstr_free (&nomD);
-    zstr_free (&sentence);
-    zmsg_destroy (&message);
-    
-    
-    message = zmsg_new();
-    zmsg_addstr (message, clientName.c_str());
-    zmsg_addstr (message, std::string("Good bye " + knowName + " !").c_str());
-    
-    rv = mlm_client_sendto (client, servAddress, "example", NULL, 1000, &message);
-    if(rv != 0)
-        return -1;
-    message = mlm_client_recv (client);
-    if(!message)
-        return -1;
-    
-    nomD = zmsg_popstr (message);
-    sentence = zmsg_popstr (message);
-    expected = "Good bye " + clientName + ".";
-    if(!streq(sentence, expected.c_str()))
-    {
-       zsys_error("Message expected : %s \n message get : %s", expected.c_str(), sentence);
-       return -1; 
-    }
-    
-    zsys_debug("%s say : %s", knowName.c_str(), sentence);
-    
-    zstr_free (&nomD);
-    zstr_free (&sentence);
-    zmsg_destroy (&message);
-    return 0;
+    //ok
 }
 
-
+// client callback function
 void
 fty_exdialogue_client (zsock_t *pipe, void* args)
 {
+    int verbose = 1; //default
+    
     std::vector<std::string> arguments = *(std::vector<std::string> *) args;
-    //const char * endpoint = arguments[0].c_str();
-    //const char * servName = arguments[1].c_str();
-    std::string name = arguments[0];
-    char *serverAddress = NULL;
-    
-    
-    //zsys_debug ("endpoint: %s \n", endpoint);
-    zsys_debug("Client name : %s", name.c_str());
-    
+    std::string clientName = arguments[0];
 
+    zsys_info("CLIENT %s starting...", clientName.c_str());
+
+    //create malamute client
     mlm_client_t *client = mlm_client_new ();
-    if (client == NULL) {
-        zsys_error ("mlm_client_new () failed.");
+    if (!client) {
+        zsys_error("CLIENT mlm_client_new() failed.");
         return;
     }
-    
-    
 
+    //create poller on main pipe
     zpoller_t *poller = zpoller_new (pipe, NULL);
-    zsock_signal (pipe, 0);
-    zsys_debug ("actor ready");
+    zsock_signal (pipe, 0); //SIG needed (wakeup)
 
-    while (!zsys_interrupted) {
-        void *which = zpoller_wait (poller, -1);
-        if (which == pipe) {
+    zsys_debug("CLIENT %s ready", clientName.c_str());
+    
+    //start polling
+    const int TIMEOUT = 5000; //ms
+    int stop = 0; //internal abort flag
+
+    while (!zsys_interrupted && !stop) {
+        //wait for inputs
+        void *sock = zpoller_wait (poller, -1);
+
+        if (sock == pipe) {
             zmsg_t *message = zmsg_recv (pipe);
-            char *actor_command = zmsg_popstr (message);
-            //  $TERM actor command implementation is required by zactor_t interface
-            if (streq (actor_command, "$TERM")) {
-                zstr_free (&actor_command);
-                zmsg_destroy (&message);
-                break;
-            } else if (streq (actor_command, "BIND")) {      
-                //zsys_debug ("bind ask");
-                char *endpoint = zmsg_popstr (message);
-                char *myname = zmsg_popstr (message);
-                if(endpoint == NULL || myname == NULL)
+            char *command = zmsg_popstr (message);
+ 
+            assert(message);
+            assert(command);
+  
+            //$TERM command implementation is required by zactor_t interface
+            if (streq (command, "$TERM")) {
+               zsys_debug("CLIENT %s %s", clientName.c_str(), command);
+               stop = 1; //abort
+            }//$TERM
+ 
+            //BIND command
+            if (streq (command, "BIND")) {      
+                char *endpoint = zmsg_popstr(message);
+                char *address = zmsg_popstr(message); //address
+                assert(endpoint);
+                assert(address);
+
+                zsys_debug("CLIENT %s %s %s %s", clientName.c_str(), command, endpoint, address);
+
+                if (!(endpoint && address))
                 {
-                    zsys_error ("bad message content");
-                    zstr_free (&actor_command);
-                    zmsg_destroy (&message);                    
-                    zpoller_destroy (&poller);
-                    break;                    
+                    zsys_error ("CLIENT bad message content");
+                    stop = 1; //abort                    
+                } else {
+                    int rv = mlm_client_connect (client, endpoint, TIMEOUT, address);
+                    if (rv == -1) {
+                        zsys_error (
+                                "CLIENT mlm_client_connect() failed (endpoint = '%s',address = '%s')",
+                                endpoint, address);
+ 
+                        stop = 1; //abort                    
+                    }
                 }
-                //assert (endpoint && myname);
-                int rv = mlm_client_connect (client, endpoint, 5000, myname);
-                if (rv == -1) {
-                    mlm_client_destroy (&client);
-                    zsys_error (
-                            "mlm_client_connect (endpoint = '%s', timeout = '%d', address = '%s') failed.",
-                            endpoint, 5000, myname);
-                    zstr_free (&endpoint);
-                    zstr_free (&myname);  
-                    zstr_free (&actor_command);
-                    zmsg_destroy (&message);                    
-                    zpoller_destroy (&poller);
-                    break;
-                }
-               // zsys_debug ("bind ok");
+
+                //cleanup
                 zstr_free(&endpoint);
-                zstr_free(&myname);
-            } else if (streq (actor_command, "START")) {
-                //zsys_debug ("start ask");
-                serverAddress = zmsg_popstr (message);
-                if(serverAddress == NULL)
-                {
-                    zsys_error ("Incorrect START message");
-                    mlm_client_destroy (&client);
-                    zstr_free (&actor_command);
-                    zmsg_destroy (&message);                    
-                    zpoller_destroy (&poller);
-                    break;
-                }
-                
-                //zsys_debug ("start ready");
-                s_dialogue_mailbox(client, name,serverAddress);
-                //zsys_debug ("start ok");
-                zstr_free(&serverAddress);
-                
+                zstr_free(&address);
+            }//BIND
+
+            //VERBOSE command
+            if (streq (command, "VERBOSE")) {
+                char *param = zmsg_popstr(message); //'true'/'false'
+                assert(param);
+                zsys_debug("SERVER %s %s %s", clientName.c_str(), command, param);
+                verbose = streq(param, "true") ? 1 : 0;
+                 //cleanup
+                zstr_free(&param);                    
             }
-            zstr_free (&actor_command);
-            zmsg_destroy (&message);
+
+            //START command
+            if (streq (command, "START")) {
+                char *serverAddress = zmsg_popstr(message);
+
+                zsys_debug("CLIENT %s %s %s", clientName.c_str(), command, serverAddress);
+
+                if (!serverAddress)
+                {
+                    zsys_error("CLIENT Incorrect message");
+                    stop = 1; //abort
+                } else {
+                    //handle mailbox msg
+                    s_dialogue_mailbox(client, clientName.c_str(), serverAddress);
+                }
+ 
+                //cleanup
+                zstr_free(&serverAddress);
+            }//START
+
+            //cleanup
+            zstr_free(&command);
+            zmsg_destroy(&message);
+            
             continue;
         }
         
         //TODO, test timeout
     }
 
-    mlm_client_destroy (&client);
-    zpoller_destroy (&poller);
+    zsys_info("CLIENT %s ended", clientName.c_str());
+
+    //cleanup
+    mlm_client_destroy(&client);
+    zpoller_destroy(&poller);
 }
 
 //  --------------------------------------------------------------------------
