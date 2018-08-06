@@ -309,5 +309,8 @@ fty_exdialogue_client (zsock_t *pipe, void* args)
 void
 fty_exdialogue_client_test (bool verbose)
 {
-    printf ("OK\n");
+    // @selftest
+    zsys_info ("fty_exdialogue_client_test started");
+    // @end
+    zsys_info ("fty_exdialogue_client_test ended");
 }

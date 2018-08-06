@@ -263,104 +263,129 @@ fty_exdialogue_server (zsock_t *pipe, void* args)
 
 //  --------------------------------------------------------------------------
 //  Self test of this class
+//  NOTE: test the whole communication scheme beetween server and client,
+//  then the client selftest fty_exdialogue_client_test() is empty.
 
 void
 fty_exdialogue_server_test (bool verbose)
 {
-
-    //  @selftest
+    int rv;
     
-    printf (" * fty_exdialogue_server: ");
+    // @selftest
+    zsys_info ("fty_exdialogue_server_test started");
+    
+    static const char* endpoint = "inproc://fty-exdialogue-server-test"; 
+
     std::string serverAddress("testServeurDialogue");
     //const char *nomServ = std::string("testServeurDialogue").c_str();
-    static const char* endpoint = "inproc://fty-exdialogue-server-test"; 
     std::string clientName("Maurice");
     
-     //  Set up broker, fty example server actor and third party actor
+    //  Set up broker, fty example server actor and third party actor
     zactor_t *server = zactor_new (mlm_server, (void*)"Malamute");
     zstr_sendx (server, "BIND", endpoint, NULL);
     if (verbose)
         zstr_send (server, "VERBOSE");
-    
-    
+
+    //instanciate a server
     std::vector<std::string> arguments;
     arguments.push_back("Georges");
     zactor_t *example_server = zactor_new (fty_exdialogue_server, (void*) &arguments);
     zstr_sendx (example_server, "BIND", endpoint, serverAddress.c_str(), NULL);
-    
+
+    //instanciate a client
     mlm_client_t *client = mlm_client_new ();
-    int rv = mlm_client_connect (client, endpoint, 5000, "clientDialogue");
+    rv = mlm_client_connect (client, endpoint, 5000, "clientDialogue");
     assert(rv == 0);
     
-    zmsg_t *message = zmsg_new();
-    std::string knowName("Stranger");
-    zmsg_addstr (message, clientName.c_str());
-    zmsg_addstr (message, "Hello !");
-    rv = mlm_client_sendto (client, serverAddress.c_str(), "example", NULL, 1000, &message);
-   assert(rv == 0);
-    message = mlm_client_recv (client);
-    assert(message);
+    std::string knowName("Stranger"); //current name (anonymous)
+
+    zmsg_t *message = NULL;
+    char *nomD = NULL, *phrase = NULL;
+    std::string expected;
+
+    {
+        //send 'hello' msg to server
+        message = zmsg_new();
+        zmsg_addstr (message, clientName.c_str());
+        zmsg_addstr (message, "Hello !");
+        rv = mlm_client_sendto (client, serverAddress.c_str(), "example", NULL, 1000, &message);
+        assert(rv == 0);
+        //rcv response
+        message = mlm_client_recv (client);
+        assert(message);
+        //check response
+        nomD = zmsg_popstr (message);
+        phrase = zmsg_popstr (message);
+        assert(nomD && phrase);
+        expected = "Hello " + clientName + ".";
+        if (verbose)
+            zsys_debug("%s say : %s", knowName.c_str(), phrase);
+        assert(streq(phrase, expected.c_str()));
+
+        //cleanup
+        zstr_free (&nomD);
+        zstr_free (&phrase);
+        zmsg_destroy (&message);
+    }
+
+    {
+        //send 'who are you?' msg to server
+        message = zmsg_new();
+        zmsg_addstr (message, clientName.c_str());
+        zmsg_addstr (message, "Who are you ?");
+        rv = mlm_client_sendto (client, serverAddress.c_str(), "example", NULL, 1000, &message);
+        assert(rv == 0);
+        //rcv response
+        message = mlm_client_recv (client);
+        assert(message);
+        //check response
+        nomD = zmsg_popstr (message);
+        phrase = zmsg_popstr (message);
+        assert(nomD && phrase);
+        expected = "My name is " + std::string(nomD);
+        if (verbose)
+            zsys_debug("%s say : %s", knowName.c_str(), phrase);
+        assert(streq(phrase, expected.c_str()));
+
+        //save name
+        knowName = nomD;
+
+        //cleanup
+        zstr_free (&nomD);
+        zstr_free (&phrase);
+        zmsg_destroy (&message);
+    }
+
+    {
+        //send 'goodbye' msg to server
+        message = zmsg_new();
+        zmsg_addstr (message, clientName.c_str());
+        zmsg_addstr (message, std::string("Good bye " + knowName + " !").c_str());
+        rv = mlm_client_sendto (client, serverAddress.c_str(), "example", NULL, 1000, &message);
+        assert(rv == 0);
+        //rcv response
+        message = mlm_client_recv (client);
+        assert(message);
+        //check response
+        nomD = zmsg_popstr (message);
+        phrase = zmsg_popstr (message);
+        assert(nomD && phrase);
+        expected = "Good bye " + clientName + ".";
+        if (verbose)
+            zsys_debug("%s say : %s", knowName.c_str(), phrase);
+        assert(streq(phrase, expected.c_str()));
+
+        //cleanup
+        zstr_free (&nomD);
+        zstr_free (&phrase);
+        zmsg_destroy (&message); 
+    }
     
-    char *nomD = zmsg_popstr (message);
-    char *phrase = zmsg_popstr (message);
-    std::string expected = "Hello " + clientName + ".";
-    assert(streq(phrase, expected.c_str()));
-    
-    zsys_debug("%s say : %s", knowName.c_str(), phrase);
-    
-    zstr_free (&nomD);
-    zstr_free (&phrase);
-    zmsg_destroy (&message);
-    
-    
-    
-    message = zmsg_new();
-    zmsg_addstr (message, clientName.c_str());
-    zmsg_addstr (message, "Who are you ?");
-    rv = mlm_client_sendto (client, serverAddress.c_str(), "example", NULL, 1000, &message);
-    
-    assert(rv == 0);
-    
-    message = mlm_client_recv (client);
-    assert(message);
-    
-    nomD = zmsg_popstr (message);
-    phrase = zmsg_popstr (message);
-    expected = "My name is " + std::string(nomD);
-    assert(streq(phrase, expected.c_str()));
-    
-    zsys_debug("%s say : %s", knowName.c_str(), phrase);
-    
-    knowName = nomD;
-    zstr_free (&nomD);
-    zstr_free (&phrase);
-    zmsg_destroy (&message);
-    
-    
-    message = zmsg_new();
-    zmsg_addstr (message, clientName.c_str());
-    zmsg_addstr (message, std::string("Good bye " + knowName + " !").c_str());
-    
-    rv = mlm_client_sendto (client, serverAddress.c_str(), "example", NULL, 1000, &message);
-    assert(rv == 0);
-    message = mlm_client_recv (client);
-    assert(message);
-    
-    nomD = zmsg_popstr (message);
-    phrase = zmsg_popstr (message);
-    expected = "Good bye " + clientName + ".";
-    assert(streq(phrase, expected.c_str()));
-    
-    zsys_debug("%s say : %s", knowName.c_str(), phrase);
-    
-    zstr_free (&nomD);
-    zstr_free (&phrase);
-    zmsg_destroy (&message); 
-    
+    //cleanup
     mlm_client_destroy (&client);
     zactor_destroy (&example_server);
     zactor_destroy (&server);
 
-    //  @end
-    printf ("OK\n");
+    // @end
+    zsys_info ("fty_exdialogue_server_test ended");
 }
