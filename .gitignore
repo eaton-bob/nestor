@@ -128,3 +128,13 @@ bindings/qt/selftest/selftest
 
 # editor backups
 *~
+
+###
+.clang-format
+.editorconfig
+*.cmake
+builds/cmake/Config.cmake.in
+builds/cmake/Modules/
+builds/cmake/clang-format-check.sh.in
+malamute.cfg
+

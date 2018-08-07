@@ -1,5 +1,4 @@
 usr/bin/fty-exdialogue
-usr/share/man/man1/fty-exdialogue.1
 etc/fty-exdialogue/fty-exdialogue.cfg
 lib/systemd/system/fty-exdialogue.service
 

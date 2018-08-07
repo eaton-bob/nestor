@@ -30,109 +30,156 @@
 #include <iostream>
 #include <string>
 
+//required classes (server, client)
 #include "fty_exdialogue_classes.h"
 
+// display help to console
+static void console_help() {
+    printf("fty-exdialogue [options]\n");
+    printf("  --config / -c    configuration file\n");
+    printf("  --verbose / -v   verbose test output\n");
+    printf("  --help / -h      this information\n");
+}
+
+// app main entry
 int main (int argc, char *argv [])
 {
-    bool verbose = false;
+    bool verbose = false; //default
     char *config_file = NULL;
-    int argn;
-    
-    for (argn = 1; argn < argc; argn++) {
-        char *param = NULL;
-        if (argn < argc - 1) param = argv [argn+1];
-        if (streq (argv [argn], "--help")
-        ||  streq (argv [argn], "-h")) {
-            puts ("fty-exdialogue [options] ...");
-            puts ("  --verbose / -v         verbose test output");
-            puts ("  --help / -h            this information");
-            return 0;
-        }
-        else
-        if (streq (argv [argn], "--verbose")
-        ||  streq (argv [argn], "-v"))
-        {
+	zconfig_t *config = NULL;
+
+	//parse arguments
+    for (int i = 1; i < argc; i++) {
+        const char *arg = argv[i];
+        assert(arg);
+        
+        if (streq (arg, "--help") ||  streq (arg, "-h")) {
+            console_help();
+            return EXIT_FAILURE;
+        } else if (streq (arg, "--verbose") || streq (arg, "-v")) {
             verbose = true;
+        } else if (streq (arg, "--config") || streq (arg, "-c")) {
+           char *param = (i < (argc - 1)) ? argv[i+1] : NULL;
+ 
+           if (!param) {
+               printf("ARG %s: missing config-file parameter\n", arg);
+               return EXIT_FAILURE;
+           }
+           config_file = strdup(param);
+           i++; //skip param arg
+        } else {
+            printf ("ARG %s: unknown\n", arg);
+            return EXIT_FAILURE;
         }
-        else if (streq (argv [argn], "--config") || streq (argv [argn], "-c")) {
-            if (param) config_file = param;
-            ++argn;
-        }
-        else {
-            printf ("Unknown option: %s\n", argv [argn]);
-            return 1;
-        }
-    }
-    //  Insert main code here
-    if (verbose)
-        zsys_info ("fty_exdialogue - Binary");
-    
+    }//for
+
+    //config vars (default)
     char *endpoint = (char*)"ipc://@/malamute";
-    char *serverName = (char*) "Baptiste";
-    char *clientName1 = (char*) "Louis";
-    char *clientName2 = (char*) "Fabrice";
-    zconfig_t *config = NULL;
+    char *serverName = (char*)"Baptiste";
+    char *client1Name = (char*)"Louis";
+    char *client2Name = (char*)"Fabrice";
+
     //parse config file
-    if(config_file){
-        //zconfig_t *config = NULL;
-        printf ("fty_exdialogue:LOAD: %s \n", config_file);
-        config = zconfig_load (config_file);
+    if (config_file) {
+        zsys_debug ("CONFIG %s", config_file);
+		
+        config = zconfig_load(config_file);
         if (!config) {
-            printf("Failed to load config file %s: \n", config_file);
-            exit (EXIT_FAILURE);
+            zsys_error("CONFIG Failed to load %s", config_file);
+            free(config_file);
+            return EXIT_FAILURE;
         }
-        // VERBOSE
-        if (streq (zconfig_get (config, "server/verbose", "false"), "true")) {
+
+        //verbose
+        if (streq(zconfig_get (config, "server/verbose", "false"), "true")) {
             verbose = true;
+        } else {
+            verbose = false;
         }
-        endpoint = zconfig_get (config, "malamute/endpoint", endpoint);
+
+        //endpoint, server and clients names
+        endpoint = zconfig_get(config, "malamute/endpoint", endpoint);
         serverName = zconfig_get(config, "dialogue/serverdname", serverName);
-        clientName1 = zconfig_get(config, "dialogue/clientdname1", clientName1);
-        clientName2 = zconfig_get(config, "dialogue/clientdname2", clientName2);
-       //actor_name = s_get (config, "malamute/address", actor_name);
-       // fty_info_command = s_get (config, "fty-info/command", fty_info_command);
-       // zconfig_destroy (&config);
-    }
-    
-   //create server
-    std::string serverAddress("servDialogue"+std::string(serverName));
-    std::vector<std::string> arguments;
-    arguments.push_back(std::string(serverName));
-    
-    zactor_t *example_server = zactor_new (fty_exdialogue_server, (void *) &arguments);
-    zstr_sendx (example_server, "BIND", endpoint, serverAddress.c_str(), NULL);
-    
-    //create first client
-    arguments.clear();
-    arguments.push_back(std::string(clientName1));
-    std::string addressClient1("clientDia"+std::string(clientName1));
-    
-    zactor_t *first_client = zactor_new (fty_exdialogue_client, (void *) &arguments);
-    zstr_sendx(first_client, "BIND", endpoint, addressClient1.c_str(), NULL);
-    
-    
-    //create second client
-    arguments.clear();
-    arguments.push_back(std::string(clientName2));
-    std::string addressClient2("clientDia"+std::string(clientName2));
-    
-    zactor_t *second_client = zactor_new (fty_exdialogue_client, (void *) &arguments);
-    zstr_sendx(second_client, "BIND", endpoint, addressClient2.c_str(), NULL);
-    
-    
-    
-    //Launch client :   
-    
-    while (!zsys_interrupted) {
-        zstr_sendx(first_client, "START", serverAddress.c_str(), NULL);
-        zstr_sendx(second_client, "START", serverAddress.c_str(), NULL);
-        sleep(1); 
+        client1Name = zconfig_get(config, "dialogue/clientdname1", client1Name);
+        client2Name = zconfig_get(config, "dialogue/clientdname2", client2Name);
+
+        //actor_name = s_get (config, "malamute/address", actor_name);
+        //fty_info_command = s_get (config, "fty-info/command", fty_info_command);
+        //zconfig_destroy (&config);
+        
+        //done
+        free(config_file);
+        config_file = NULL;
+    }//if
+
+    //display config vars
+    if (verbose) {
+        zsys_info("APP %s starting...", argv[0]);
+        zsys_info("APP endpoint: %s, serverName: %s, client1Name: %s, client2Name: %s",
+            endpoint, serverName, client1Name, client2Name);
     }
 
-    if(config_file)
-        zconfig_destroy (&config);
-    zactor_destroy (&example_server);
-    zactor_destroy (&first_client);
-    zactor_destroy (&second_client);
-    return EXIT_SUCCESS;
+    //actors decl.
+    zactor_t *serverActor = NULL;
+    zactor_t *client1Actor = NULL;
+    zactor_t *client2Actor = NULL;
+
+    // temp args vector
+    std::vector<std::string> arguments;
+ 
+    //create server actor and bind it
+    arguments.clear();
+    arguments.push_back(std::string(serverName));
+    std::string serverAddress("servDialogue"+std::string(serverName));
+
+    serverActor = zactor_new (fty_exdialogue_server, (void*)&arguments);
+    assert(serverActor);
+    zstr_sendx (serverActor, "BIND", endpoint, serverAddress.c_str(), NULL);
+    
+    //create client1 actor and bind it
+    arguments.clear();
+    arguments.push_back(std::string(client1Name));
+    std::string client1Address("clientDia" + std::string(client1Name));
+
+    client1Actor = zactor_new (fty_exdialogue_client, (void*)&arguments);
+    assert(client1Actor);
+    zstr_sendx(client1Actor, "BIND", endpoint, client1Address.c_str(), NULL);
+    
+    //create client2 actor and bind it
+    arguments.clear();
+    arguments.push_back(std::string(client2Name));
+    std::string client2Address("clientDia" + std::string(client2Name));
+
+    client2Actor = zactor_new (fty_exdialogue_client, (void*)&arguments);
+    assert(client2Actor);
+    zstr_sendx(client2Actor, "BIND", endpoint, client2Address.c_str(), NULL);
+
+    //forward verbosity to actors
+    if (false) { // ZZZ not really handled, skipped
+        zstr_sendx(serverActor,  "VERBOSE", (verbose ? "true" : "false"), NULL);
+        zstr_sendx(client1Actor, "VERBOSE", (verbose ? "true" : "false"), NULL);
+        zstr_sendx(client2Actor, "VERBOSE", (verbose ? "true" : "false"), NULL);
+    }
+   
+    //send 'start' message to clients/ each second   
+    while (!zsys_interrupted) {
+        zstr_sendx(client1Actor, "START", serverAddress.c_str(), NULL);
+        zstr_sendx(client2Actor, "START", serverAddress.c_str(), NULL);
+        sleep(1); //seconds 
+    }
+
+    //cleanup 
+    zconfig_destroy(&config);
+    //WARN: the last zactor_destroy() call generates a "Invalid argument (src/mutex.hpp:142)" message.
+    //      When changing the order calls, it's always the latest call that gen. the message
+    //      see https://github.com/zeromq/libzmq/issues/2991
+	//		decl. issue #4
+    zactor_destroy(&serverActor);
+    zactor_destroy(&client1Actor);
+//WA issue#4 : don't call latest zactor_destroy()
+#ifndef WORKAROUND_ISSUE4
+    zactor_destroy(&client2Actor);
+#endif
+	
+    return EXIT_SUCCESS; //ok
 }

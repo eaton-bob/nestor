@@ -8,11 +8,7 @@ DISTCHECK_CONFIGURE_FLAGS = \
 
 ACLOCAL_AMFLAGS = -I config
 
-AM_CFLAGS = \
-    -Werror=format-security
-
 AM_CXXFLAGS = \
-    -Werror=format-security \
     -std=c++11
 
 AM_CPPFLAGS = \
@@ -25,7 +21,10 @@ AM_CPPFLAGS = \
 project_libs = ${libzmq_LIBS} ${czmq_LIBS} ${malamute_LIBS}
 
 SUBDIRS = doc
+SUBDIRS += include
 DIST_SUBDIRS = doc
+DIST_SUBDIRS += include
+
 lib_LTLIBRARIES =
 bin_PROGRAMS =
 noinst_PROGRAMS =
@@ -38,15 +37,19 @@ EXTRA_DIST =
 CLEANFILES =
 DISTCLEANFILES =
 
-#if ENABLE_DIST_CMAKEFILES
-#EXTRA_DIST += \
-#    Findlibzmq.cmake \
-#    Findczmq.cmake \
-#    Findmalamute.cmake \
-#    CMakeLists.txt
-#endif
+if ENABLE_DIST_CMAKEFILES
+EXTRA_DIST += \
+    Findlibzmq.cmake \
+    Findczmq.cmake \
+    Findmalamute.cmake \
+    builds/cmake/Modules/ClangFormat.cmake \
+    builds/cmake/clang-format-check.sh.in \
+    builds/cmake/Config.cmake.in \
+    CMakeLists.txt
+endif
 
 EXTRA_DIST += \
+    README.md \
     src/fty_exdialogue_classes.h
 
 # NOTE: this "include" syntax is not a "make" but an "autotools" keyword,
