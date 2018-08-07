@@ -36,6 +36,7 @@
 // display help to console
 static void console_help() {
     printf("fty-exdialogue [options]\n");
+    printf("  --config / -c    configuration file\n");
     printf("  --verbose / -v   verbose test output\n");
     printf("  --help / -h      this information\n");
 }
