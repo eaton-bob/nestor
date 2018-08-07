@@ -46,8 +46,9 @@ int main (int argc, char *argv [])
 {
     bool verbose = false; //default
     char *config_file = NULL;
+	zconfig_t *config = NULL;
 
-    //parse arguments
+	//parse arguments
     for (int i = 1; i < argc; i++) {
         const char *arg = argv[i];
         assert(arg);
@@ -80,9 +81,8 @@ int main (int argc, char *argv [])
 
     //parse config file
     if (config_file) {
-        zconfig_t *config = NULL;
- 
         zsys_debug ("CONFIG %s", config_file);
+		
         config = zconfig_load(config_file);
         if (!config) {
             zsys_error("CONFIG Failed to load %s", config_file);
@@ -107,8 +107,7 @@ int main (int argc, char *argv [])
         //fty_info_command = s_get (config, "fty-info/command", fty_info_command);
         //zconfig_destroy (&config);
         
-        //done with that vars
-        zconfig_destroy(&config);
+        //done
         free(config_file);
         config_file = NULL;
     }//if
@@ -170,6 +169,7 @@ int main (int argc, char *argv [])
     }
 
     //cleanup 
+    zconfig_destroy(&config);
     //WARN: the last zactor_destroy() call generates a "Invalid argument (src/mutex.hpp:142)" message.
     //      When changing the order calls, it's always the latest call that gen. the message
     //      see https://github.com/zeromq/libzmq/issues/2991
