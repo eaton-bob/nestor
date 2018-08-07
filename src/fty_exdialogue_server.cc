@@ -269,7 +269,8 @@ fty_exdialogue_server (zsock_t *pipe, void* args)
 void
 fty_exdialogue_server_test (bool verbose)
 {
-    int rv;
+	// @selftest
+	int rv;
     
     // @selftest
     zsys_info ("fty_exdialogue_server_test started");
