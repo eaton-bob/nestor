@@ -36,6 +36,11 @@
 
 //  Opaque class structures to allow forward references
 
+//WA issue #4 "Message "Invalid argument (src/mutex.hpp:142)"
+//see https://github.com/eaton-bob/nestor/issues/4
+//comment the line below to disable WA
+#define WORKAROUND_ISSUE4
+
 //  Internal API
 
 

@@ -385,8 +385,11 @@ fty_exdialogue_server_test (bool verbose)
     //cleanup
     mlm_client_destroy (&client);
     zactor_destroy (&example_server);
+//WA issue#4 : don't call latest zactor_destroy()
+#ifndef WORKAROUND_ISSUE4
     zactor_destroy (&server);
-
+#endif
+	
     // @end
     zsys_info ("fty_exdialogue_server_test ended");
 }

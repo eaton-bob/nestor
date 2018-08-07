@@ -173,9 +173,13 @@ int main (int argc, char *argv [])
     //WARN: the last zactor_destroy() call generates a "Invalid argument (src/mutex.hpp:142)" message.
     //      When changing the order calls, it's always the latest call that gen. the message
     //      see https://github.com/zeromq/libzmq/issues/2991
+	//		decl. issue #4
     zactor_destroy(&serverActor);
     zactor_destroy(&client1Actor);
+//WA issue#4 : don't call latest zactor_destroy()
+#ifndef WORKAROUND_ISSUE4
     zactor_destroy(&client2Actor);
-    
+#endif
+	
     return EXIT_SUCCESS; //ok
 }
